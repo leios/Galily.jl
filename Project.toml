@@ -1,0 +1,4 @@
+name = "Galily"
+uuid = "c27a162c-a7bd-40d8-9635-52bd4f9866bf"
+authors = ["James Schloss <jrs.schloss@gmail.com>"]
+version = "0.1.0"
