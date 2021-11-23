@@ -1,7 +1,7 @@
 export run
 
 function run(particle_number, dt, iterations; dims = 2,
-             force_law = gravity, sim_type = nbody!, integrator = verlet,
+             force_law = gravity, sim_type = nbody!, integrator = verlet!,
              output_method = :file_output, filename = "check.dat")
     p_set = initialize(particle_number; dims = dims)
     p_set2 = initialize(particle_number; dims = dims)
@@ -12,6 +12,7 @@ function run(particle_number, dt, iterations; dims = 2,
 
         if output_method == :file_output
             write_to_file!(filename, p_set.positions)
+            write_to_file!("accelerations.dat", p_set.positions)
         end 
     end 
 end

@@ -28,3 +28,9 @@ The overall research ambitions here are to improve N body simulations, in genera
 - Can we optimize N-body simulations using better spatial splitting techniques
     - Can we use adaptive mesh refinement for video color quantization 
       (follow-up)
+
+## Notes
+
+- Work on inialization to ensure that particle acceleration is actually correct
+- Make a more realistic gravitational force
+- KA...
