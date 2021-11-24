@@ -31,6 +31,7 @@ The overall research ambitions here are to improve N body simulations, in genera
 
 ## Notes
 
-- Work on inialization to ensure that particle acceleration is actually correct
 - Make a more realistic gravitational force
+    - Add softening
+    - Add G constants
 - KA...

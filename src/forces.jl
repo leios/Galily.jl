@@ -5,31 +5,25 @@ end
 
 function gravity(pos1, pos2)
     if pos1 != pos2
-        return 1/((pos2 - pos1)*(pos2 - pos1))
+        r2 = sum((pos2-pos1) .* (pos2-pos1))
+        u = (pos2-pos1)/sqrt(r2)
+        return (-u/(r2+1))
     else
         return 0
     end
 end
 
 function nbody!(accelerations, positions; force_law=gravity)
-    for i = 1:length(positions)
-    temp_acceleration = 0
-        for j = 1:length(positions)
-            temp_acceleration = force_law(positions[i], positions[j])
+    for i = 1:size(positions)[1]
+        temp_acceleration = zeros(size(positions)[2])
+        for j = 1:size(positions)[1]
+            temp_acceleration .+= force_law(positions[j,:], positions[i,:])
         end
-    accelerations[i] = temp_acceleration
+        accelerations[i,:] .= temp_acceleration[:]
     end 
 end
 
 function verlet!(p_set1::Particles, p_set2::Particles, dt; calc_velocity=true)
-#=
-    for i = 1:size(p_set1.positions)[1]
-        println(p_set1.positions[i])
-        verlet!(p_set1.positions[i], p_set2.positions[i],
-                p_set1.accelerations[i], p_set2.accelerations[i], dt)
-        println(p_set1.positions[i])
-    end 
-=#
 
     verlet!(p_set1.positions, p_set2.positions,
             p_set1.accelerations, p_set2.accelerations, dt)

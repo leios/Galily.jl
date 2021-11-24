@@ -1,3 +1,5 @@
 papers/*
 Manifest.toml
 *.dat
+*.png
+*.mp4
