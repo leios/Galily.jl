@@ -16,7 +16,7 @@ function find_accelerations(p_set::Particles, temp_accelerations;
             ndrange = size(p_set.positions)[1])
 end
 
-function repulsive(positions, temp_acceleration, tid, j)
+function repulsive(positions, temp_accelerations, tid, j)
     r2 = 0
 
     for k = 1:size(positions)[2]
@@ -26,11 +26,11 @@ function repulsive(positions, temp_acceleration, tid, j)
 
     for k = 1:size(positions)[2]
         u = (positions[tid,k]-positions[j,k])/sqrt(r2)
-        temp_acceleration[tid,k] += (u/(r2+1))
+        temp_accelerations[tid,k] += (u/(r2+1))
     end
 end
 
-function gravity(positions, temp_acceleration, tid, j)
+function gravity(positions, temp_accelerations, tid, j)
     r2 = 0
 
     for k = 1:size(positions)[2]
@@ -40,29 +40,34 @@ function gravity(positions, temp_acceleration, tid, j)
 
     for k = 1:size(positions)[2]
         u = (positions[tid,k]-positions[j,k])/sqrt(r2)
-        temp_acceleration[tid,k] += (-u/(r2+1))
+        temp_accelerations[tid,k] += (-u/(r2+1))
     end
 end
 
 # TODO: using 2D indexing to avoid for loops in k
 # TODO: parallel summation for accelerations
-@kernel function nbody!(accelerations, positions, temp_acceleration, force_law)
+@kernel function nbody!(accelerations, positions, temp_accelerations, force_law)
     tid = @index(Global, Linear)
+
+    for k = 1:size(positions)[2]
+        temp_accelerations[tid,k] = 0
+    end 
 
     for j = 1:size(positions)[1]
         if j != tid
-            force_law(positions, temp_acceleration, tid, j)
+            force_law(positions, temp_accelerations, tid, j)
         end
     end
 
     @synchronize
     for j = 1:size(accelerations)[2]
-        accelerations[tid,j] = temp_acceleration[tid, j]
+        accelerations[tid,j] = temp_accelerations[tid, j]
     end
 
 end
 
-function verlet!(p_set1::Particles, p_set2::Particles, dt; calc_velocity=true,
+function verlet!(p_set1::Particles, p_set2::Particles, temp_positions, dt;
+                 calc_velocity=true,
                  num_threads = 256, num_cores=4)
 
     if isa(p_set1.positions, Array)
@@ -73,7 +78,7 @@ function verlet!(p_set1::Particles, p_set2::Particles, dt; calc_velocity=true,
 
     kernel!(p_set1.positions, p_set2.positions,
             p_set1.accelerations, p_set2.accelerations,
-            copy(p_set1.positions), dt, ndrange=size(p_set1.positions))
+            temp_positions, dt, ndrange=size(p_set1.positions))
 
     if calc_velocity
 
@@ -92,6 +97,7 @@ end
 @kernel function verlet_kernel!(pos1, pos2, acc1, acc2, temp_pos, dt)
     tid = @index(Global, Linear)
 
+    temp_pos[tid] = pos1[tid]
     pos1[tid] = pos1[tid] * 2 - pos2[tid] + acc1[tid]*dt*dt
 
     pos2[tid] = temp_pos[tid]

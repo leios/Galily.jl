@@ -11,7 +11,7 @@ function run(particle_number, dt, iterations; dims = 2,
     p_set2 = Particles(copy(p_set.positions),
                        copy(p_set.velocities),
                        copy(p_set.accelerations))
-    temp_accelerations = ArrayType(zeros(size(p_set.accelerations)))
+    temp_vector = similar(p_set.accelerations)
 
     for i = 1:iterations
         if output_method == :file_output
@@ -21,8 +21,7 @@ function run(particle_number, dt, iterations; dims = 2,
                            project=project, l=l)
         end 
 
-        wait(find_accelerations(p_set, temp_accelerations; force_law=force_law))
-        wait(integrator(p_set, p_set2, dt))
-        temp_accelerations[:] .= 0
+        wait(find_accelerations(p_set, temp_vector; force_law=force_law))
+        wait(integrator(p_set, p_set2, temp_vector, dt))
     end 
 end
