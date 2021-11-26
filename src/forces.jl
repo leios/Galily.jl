@@ -13,39 +13,47 @@ function find_accelerations(p_set::Particles, ArrayType;
     kernel!(p_set.accelerations,
             p_set.positions,
             temp_accelerations,
+            force_law,
             ndrange = size(p_set.positions)[1])
 end
 
-function gravity(pos1, pos2)
-    if pos1 != pos2
-        r2 = sum((pos2-pos1) .* (pos2-pos1))
-        u = (pos2-pos1)/sqrt(r2)
-        return (-u/(r2+1))
-    else
-        return 0
+function repulsive(positions, temp_acceleration, tid, j)
+    r2 = 0
+
+    for k = 1:size(positions)[2]
+        r2 += (positions[tid,k]-positions[j,k]) *
+              (positions[tid,k]-positions[j,k])
+    end
+
+    for k = 1:size(positions)[2]
+        u = (positions[tid,k]-positions[j,k])/sqrt(r2)
+        temp_acceleration[tid,k] += (u/(r2+1))
+    end
+end
+
+function gravity(positions, temp_acceleration, tid, j)
+    r2 = 0
+
+    for k = 1:size(positions)[2]
+        r2 += (positions[tid,k]-positions[j,k]) *
+              (positions[tid,k]-positions[j,k])
+    end
+
+    for k = 1:size(positions)[2]
+        u = (positions[tid,k]-positions[j,k])/sqrt(r2)
+        temp_acceleration[tid,k] += (-u/(r2+1))
     end
 end
 
 # TODO: using 2D indexing to avoid for loops in k
 # TODO: parallel summation for accelerations
-@kernel function nbody!(accelerations, positions, temp_acceleration)
-                        #force_law=gravity)
+@kernel function nbody!(accelerations, positions, temp_acceleration, force_law)
     tid = @index(Global, Linear)
 
     for j = 1:size(positions)[1]
         if j != tid
-            r2 = 0
-            for k = 1:size(accelerations)[2]
-                r2 += (positions[tid,k]-positions[j,k]) *
-                      (positions[tid,k]-positions[j,k])
-            end
-            for k = 1:size(accelerations)[2]
-                u = (positions[tid,k]-positions[j,k])/sqrt(r2)
-                temp_acceleration[tid,k] += (-u/(r2+1))
-            end
+            force_law(positions, temp_acceleration, tid, j)
         end
-
-        #temp_acceleration .+= force_law(positions[j,:], positions[tid,:])
     end
 
     @synchronize

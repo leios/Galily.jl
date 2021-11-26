@@ -18,7 +18,7 @@ function run(particle_number, dt, iterations; dims = 2,
             write_to_file!("accelerations.dat", Array(p_set.accelerations))
         end 
 
-        wait(find_accelerations(p_set, ArrayType))
+        wait(find_accelerations(p_set, ArrayType; force_law=force_law))
         #find_accelerations(p_set, force_law=force_law, sim_type=sim_type,
         #                   ArrayType = ArrayType)
         wait(integrator(p_set, p_set2, dt))
