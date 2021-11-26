@@ -1,6 +1,6 @@
 # Think about how to do optional arguments in KA (specifically ArrayType)
 # Try KA with optional arguments as a mwe later
-function find_accelerations(p_set::Particles, ArrayType;
+function find_accelerations(p_set::Particles, temp_accelerations;
                             sim_type=nbody!, force_law=gravity,
                             num_threads = 256, num_cores = 4)
     if isa(p_set.positions, Array)
@@ -9,7 +9,6 @@ function find_accelerations(p_set::Particles, ArrayType;
         kernel! = sim_type(CUDADevice(),num_threads)
     end
 
-    temp_accelerations = ArrayType(zeros(size(p_set.accelerations)))
     kernel!(p_set.accelerations,
             p_set.positions,
             temp_accelerations,
@@ -77,7 +76,6 @@ function verlet!(p_set1::Particles, p_set2::Particles, dt; calc_velocity=true,
             copy(p_set1.positions), dt, ndrange=size(p_set1.positions))
 
     if calc_velocity
-        temp_vel = copy(p_set1.velocities)
 
         if isa(p_set1.positions, Array)
             kernel! = calc_velocity_kernel!(CPU(),num_cores)
@@ -87,7 +85,7 @@ function verlet!(p_set1::Particles, p_set2::Particles, dt; calc_velocity=true,
 
         kernel!(p_set1.positions, p_set2.positions,
                 p_set1.velocities, p_set2.velocities,
-                copy(p_set1.velocities), dt, ndrange=size(p_set1.positions))
+                dt, ndrange=size(p_set1.positions))
     end
 end
 
@@ -100,9 +98,9 @@ end
     acc2[tid] = acc1[tid]
 end
 
-@kernel function calc_velocity_kernel!(pos1, pos2, vel1, vel2, temp_vel, dt)
+@kernel function calc_velocity_kernel!(pos1, pos2, vel1, vel2, dt)
     tid = @index(Global, Linear)
 
+    vel2[tid] = vel1[tid]
     vel1[tid] = (pos2[tid] - pos1[tid])/dt
-    vel2[tid] = temp_vel[tid]
 end
