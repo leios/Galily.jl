@@ -44,6 +44,22 @@ function gravity(positions, temp_accelerations, tid, j)
     end
 end
 
+function gravity_4d(positions, temp_accelerations, tid, j)
+    r3 = 0
+
+    for k = 1:size(positions)[2]
+        r3 += (positions[tid,k]-positions[j,k]) *
+              (positions[tid,k]-positions[j,k]) *
+              (positions[tid,k]-positions[j,k])
+    end
+
+    for k = 1:size(positions)[2]
+        u = (positions[tid,k]-positions[j,k])/cbrt(r3)
+        temp_accelerations[tid,k] += (-u/(6*(r3+1)))
+    end
+end
+
+
 # TODO: using 2D indexing to avoid for loops in k
 # TODO: parallel summation for accelerations
 @kernel function nbody!(accelerations, positions, temp_accelerations, force_law)
