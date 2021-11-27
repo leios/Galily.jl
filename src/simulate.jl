@@ -21,7 +21,7 @@ function run(particle_number, dt, iterations; dims = 2,
                            project=project, l=l)
         end 
 
-        wait(find_accelerations(p_set, temp_vector; force_law=force_law))
+        wait(find_accelerations(p_set; force_law=force_law))
         wait(integrator(p_set, p_set2, temp_vector, dt))
     end 
 end
