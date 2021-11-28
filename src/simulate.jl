@@ -3,11 +3,13 @@ export run
 function run(particle_number, dt, iterations; dims = 2,
              force_law = gravity, sim_type = nbody!, integrator = verlet!,
              output_method = :file_output, filename = "check.dat",
-             grid_extents = 1, ArrayType = Array, project = true, l = 1)
+             grid_extents = 1, ArrayType = Array, project = true, l = 1,
+             init_type = :rand)
     p_set = initialize(particle_number;
                        dims = dims,
                        grid_extents = grid_extents,
-                       ArrayType = ArrayType)
+                       ArrayType = ArrayType,
+                       init_type = init_type)
     p_set2 = Particles(copy(p_set.positions),
                        copy(p_set.velocities),
                        copy(p_set.accelerations))

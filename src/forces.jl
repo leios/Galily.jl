@@ -52,13 +52,13 @@ function gravity_4d(pos1, pos2, temp_acceleration, lid, n)
     r3 = 0
 
     for k = 1:n
-        r3 += (pos1[lid, k]-pos2[lid, k]) *
-              (pos1[lid, k]-pos2[lid, k]) *
-              (pos1[lid, k]-pos2[lid, k])
+        r3 += abs((pos1[lid, k]-pos2[lid, k]) *
+                  (pos1[lid, k]-pos2[lid, k]) *
+                  (pos1[lid, k]-pos2[lid, k]))
     end
 
     for k = 1:n
-        u = (pos1[lid, k]-pos2[k])/cbrt(r3)
+        u = (pos1[lid, k]-pos2[lid, k])/cbrt(r3)
         temp_acceleration[lid, k] += (-u/(6*(r3+1)))
     end
 end
