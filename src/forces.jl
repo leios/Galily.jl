@@ -20,44 +20,44 @@ function find_accelerations(p_set::Particles;
             ndrange = size(p_set.positions)[1])
 end
 
-function repulsive(pos1, pos2, temp_acceleration, lid)
+function repulsive(pos1, pos2, temp_acceleration, lid, n)
     r2 = 0
 
-    for k = 1:size(pos1)[2]
+    for k = 1:n
         r2 += (pos1[lid, k]-pos2[lid, k]) *
               (pos1[lid, k]-pos2[lid, k])
     end
 
-    for k = 1:size(pos1)[2]
+    for k = 1:n
         u = (pos1[lid, k]-pos2[lid, k])/sqrt(r2)
         temp_acceleration[lid, k] += (u/(r2+1))
     end
 end
 
-function gravity(pos1, pos2, temp_acceleration, lid)
+function gravity(pos1, pos2, temp_acceleration, lid, n)
     r2 = 0
 
-    for k = 1:size(pos1)[2]
+    for k = 1:n
         r2 += (pos1[lid, k]-pos2[lid, k]) *
               (pos1[lid, k]-pos2[lid, k])
     end
 
-    for k = 1:size(pos1)[2]
+    for k = 1:n
         u = (pos1[lid, k]-pos2[lid, k])/sqrt(r2)
         temp_acceleration[lid, k] += (-u/(r2+1))
     end
 end
 
-function gravity_4d(pos1, pos2, temp_acceleration, lid)
+function gravity_4d(pos1, pos2, temp_acceleration, lid, n)
     r3 = 0
 
-    for k = 1:size(pos1)[2]
+    for k = 1:n
         r3 += (pos1[lid, k]-pos2[lid, k]) *
               (pos1[lid, k]-pos2[lid, k]) *
               (pos1[lid, k]-pos2[lid, k])
     end
 
-    for k = 1:size(pos1)[2]
+    for k = 1:n
         u = (pos1[lid, k]-pos2[k])/cbrt(r3)
         temp_acceleration[lid, k] += (-u/(6*(r3+1)))
     end
@@ -90,7 +90,7 @@ end
 
             force_law(temp_position1,
                       temp_position2,
-                      temp_acceleration, lid)
+                      temp_acceleration, lid, n)
         end
     end
 
