@@ -1,10 +1,5 @@
 # Think about how to do optional arguments in KA (specifically ArrayType)
 # Try KA with optional arguments as a mwe later
-# TODO: Try this:
-#       for i = 1:n
-#           tmp_acc = find_acceleration(p1)
-#           acc[i,:] = sum(acc)
-#       end
 function find_accelerations(p_set::Particles;
                             sim_type=nbody!, force_law=gravity,
                             num_threads = 256, num_cores = 4)
@@ -17,7 +12,7 @@ function find_accelerations(p_set::Particles;
     kernel!(p_set.accelerations,
             p_set.positions,
             force_law,
-            ndrange = (size(p_set.positions)))
+            ndrange = size(p_set.positions))
 end
 
 function repulsive(pos1, pos2, temp_acceleration, lid, n)
@@ -42,13 +37,11 @@ function gravity(pos1, pos2, temp_acceleration, lid, tidx, n)
               (pos1[lid, k]-pos2[lid, k])
     end
 
-#=
     if r2 == 0
-        @print(lid, '\t, tidx)
-        #@print(pos1[lid, 1], '\t', pos1[lid, 2], '\t',
-        #       pos2[lid, 1], '\t', pos2[lid, 2], '\n')
+        #@print(lid, '\t, tidx)
+        @print(pos1[lid, 1], '\t', pos1[lid, 2], '\t',
+               pos2[lid, 1], '\t', pos2[lid, 2], '\n')
     end
-=#
 
     u = (pos1[lid, tidx]-pos2[lid, tidx])/sqrt(r2)
     temp_acceleration[lid, tidx] += (-u/(r2+1))
@@ -74,9 +67,9 @@ end
     tidy, tidx = @index(Global, NTuple)
     lid = @index(Local, Linear)
 
-    @print(tidy, '\t', tidx, '\n')
+    #@print(tidy, '\t', tidx, '\n')
 
-    n = size(accelerations)[2]
+    @uniform n = size(accelerations)[2]
 
     @uniform gs = @groupsize()[1]
     temp_acceleration = @localmem Float64 (gs, 4)
@@ -88,11 +81,14 @@ end
 
     for j = 1:size(positions)[1]
         temp_position2[lid,tidx] = positions[j,tidx]
-        @synchronize
+    end
 
-        if j != tidy
+    @synchronize
+
+    for j = 1:size(positions)[1]
+        if j != tidy && lid <= size(positions)[1]
             force_law(temp_position1,
-                      temp_position2,
+                      temp_positions2,
                       temp_acceleration, lid, tidx, n)
         end
     end
