@@ -17,7 +17,7 @@ function find_accelerations(p_set::Particles;
     kernel!(p_set.accelerations,
             p_set.positions,
             force_law,
-            ndrange = size(p_set.positions)[1])
+            ndrange = (size(p_set.positions)))
 end
 
 function repulsive(pos1, pos2, temp_acceleration, lid, n)
@@ -34,7 +34,7 @@ function repulsive(pos1, pos2, temp_acceleration, lid, n)
     end
 end
 
-function gravity(pos1, pos2, temp_acceleration, lid, n)
+function gravity(pos1, pos2, temp_acceleration, lid, tidx, n)
     r2 = 0
 
     for k = 1:n
@@ -42,13 +42,19 @@ function gravity(pos1, pos2, temp_acceleration, lid, n)
               (pos1[lid, k]-pos2[lid, k])
     end
 
-    for k = 1:n
-        u = (pos1[lid, k]-pos2[lid, k])/sqrt(r2)
-        temp_acceleration[lid, k] += (-u/(r2+1))
+#=
+    if r2 == 0
+        @print(lid, '\t, tidx)
+        #@print(pos1[lid, 1], '\t', pos1[lid, 2], '\t',
+        #       pos2[lid, 1], '\t', pos2[lid, 2], '\n')
     end
+=#
+
+    u = (pos1[lid, tidx]-pos2[lid, tidx])/sqrt(r2)
+    temp_acceleration[lid, tidx] += (-u/(r2+1))
 end
 
-function gravity_4d(pos1, pos2, temp_acceleration, lid, n)
+function gravity_4d(pos1, pos2, temp_acceleration, lid, tidx, n)
     r3 = 0
 
     for k = 1:n
@@ -57,18 +63,18 @@ function gravity_4d(pos1, pos2, temp_acceleration, lid, n)
                   (pos1[lid, k]-pos2[lid, k]))
     end
 
-    for k = 1:n
-        u = (pos1[lid, k]-pos2[lid, k])/cbrt(r3)
-        temp_acceleration[lid, k] += (-u/(6*(r3+1)))
-    end
+    u = (pos1[lid, tidx]-pos2[lid, tidx])/cbrt(r3)
+    temp_acceleration[lid, tidx] += (-u/(6*(r3+1)))
 end
 
 
 # TODO: using 2D indexing to avoid for loops in k
 # TODO: parallel summation for accelerations
 @kernel function nbody!(accelerations, positions, force_law)
-    tid = @index(Global, Linear)
+    tidy, tidx = @index(Global, NTuple)
     lid = @index(Local, Linear)
+
+    @print(tidy, '\t', tidx, '\n')
 
     n = size(accelerations)[2]
 
@@ -77,26 +83,21 @@ end
     temp_position1 = @localmem Float64 (gs, 4)
     temp_position2 = @localmem Float64 (gs, 4)
 
-    for k = 1:n
-        temp_acceleration[lid, k] = 0
-        temp_position1[lid, k] = positions[tid,k]
-    end
+    temp_acceleration[lid, tidx] = 0
+    temp_position1[lid, tidx] = positions[tidy,tidx]
 
     for j = 1:size(positions)[1]
-        if j != tid
-            for k = 1:n
-                temp_position2[lid,k] = positions[j,k]
-            end
+        temp_position2[lid,tidx] = positions[j,tidx]
+        @synchronize
 
+        if j != tidy
             force_law(temp_position1,
                       temp_position2,
-                      temp_acceleration, lid, n)
+                      temp_acceleration, lid, tidx, n)
         end
     end
 
-    for k = 1:n
-        accelerations[tid,k] = temp_acceleration[lid,k]
-    end
+    accelerations[tidy,tidx] = temp_acceleration[lid,tidx]
 
 end
 
