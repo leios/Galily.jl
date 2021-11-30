@@ -14,6 +14,8 @@ end
 function write_to_file!(filename, a; project = false, l=1)
     f = open(filename, "a")
 
+    a = transpose(a)
+
     if size(a)[2] == 4 && project
         a = project_to_3d(a, l=l)
     elseif size(a)[2] > 4

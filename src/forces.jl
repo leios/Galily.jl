@@ -1,11 +1,18 @@
 # Think about how to do optional arguments in KA (specifically ArrayType)
 # Try KA with optional arguments as a mwe later
 function find_accelerations(p_set::Particles;
-                            sim_type=nbody!, force_law=gravity,
+                            sim_type=nbody!, force_law=gravity, dims = 2,
                             num_threads = 256, num_cores = 4)
+
     if isa(p_set.positions, Array)
+        if num_cores % dims != 0
+            num_cores = floor(Int, num_cores/dims)*dims
+        end 
         kernel! = sim_type(CPU(),num_cores)
     else
+        if num_threads % dims != 0
+            num_threads = floor(Int, num_threads/dims)*dims
+        end 
         kernel! = sim_type(CUDADevice(),num_threads)
     end
 
@@ -29,22 +36,24 @@ function repulsive(pos1, pos2, temp_acceleration, lid, n)
     end
 end
 
-function gravity(pos1, pos2, temp_acceleration, lid, tidx, n)
+function gravity(pos1, pos2, temp_acceleration, lid, tidy, n)
     r2 = 0
 
     for k = 1:n
-        r2 += (pos1[lid, k]-pos2[lid, k]) *
-              (pos1[lid, k]-pos2[lid, k])
+        r2 += (pos1[k, lid]-pos2[k, lid]) *
+              (pos1[k, lid]-pos2[k, lid])
     end
 
+#=
     if r2 == 0
         #@print(lid, '\t, tidx)
-        @print(pos1[lid, 1], '\t', pos1[lid, 2], '\t',
-               pos2[lid, 1], '\t', pos2[lid, 2], '\n')
+        @print(pos1[1, lid], '\t', pos1[2, lid], '\t',
+               pos2[1, lid], '\t', pos2[2, lid], '\n')
     end
+=#
 
-    u = (pos1[lid, tidx]-pos2[lid, tidx])/sqrt(r2)
-    temp_acceleration[lid, tidx] += (-u/(r2+1))
+    u = (pos1[tidy, lid]-pos2[tidy, lid])/sqrt(r2)
+    temp_acceleration[tidy, lid] += (-u/(r2+1))
 end
 
 function gravity_4d(pos1, pos2, temp_acceleration, lid, tidx, n)
@@ -69,31 +78,30 @@ end
 
     #@print(tidy, '\t', tidx, '\n')
 
-    @uniform n = size(accelerations)[2]
+    @uniform n = size(accelerations)[1]
 
     @uniform gs = @groupsize()[1]
-    temp_acceleration = @localmem Float64 (gs, 4)
-    temp_position1 = @localmem Float64 (gs, 4)
-    temp_position2 = @localmem Float64 (gs, 4)
+    temp_acceleration = @localmem Float64 (4, gs)
+    temp_position1 = @localmem Float64 (4, gs)
+    temp_position2 = @localmem Float64 (4, gs)
 
-    temp_acceleration[lid, tidx] = 0
-    temp_position1[lid, tidx] = positions[tidy,tidx]
+    #@print(tidy, '\t', tidx, '\n')
+    #@print(size(temp_acceleration)[1], '\t', size(temp_acceleration)[2], '\n')
 
-    for j = 1:size(positions)[1]
-        temp_position2[lid,tidx] = positions[j,tidx]
-    end
+    temp_acceleration[tidy, lid] = 0
+    temp_position1[tidy, lid] = positions[tidy,tidx]
 
-    @synchronize
-
-    for j = 1:size(positions)[1]
-        if j != tidy && lid <= size(positions)[1]
+    for j = 1:size(positions)[2]
+        if j != tidx && lid <= size(positions)[2]
+            temp_position2[tidy, lid] = positions[tidy, j]
+            @synchronize
             force_law(temp_position1,
-                      temp_positions2,
-                      temp_acceleration, lid, tidx, n)
+                      temp_position2,
+                      temp_acceleration, lid, tidy, n)
         end
     end
 
-    accelerations[tidy,tidx] = temp_acceleration[lid,tidx]
+    accelerations[tidy,tidx] = temp_acceleration[tidy, lid]
 
 end
 
