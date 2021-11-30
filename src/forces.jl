@@ -6,12 +6,12 @@ function find_accelerations(p_set::Particles;
 
     if isa(p_set.positions, Array)
         if num_cores % dims != 0
-            num_cores = floor(Int, num_cores/dims)*dims
+            num_cores = (floor(Int, num_cores/dims), dims)
         end 
         kernel! = sim_type(CPU(),num_cores)
     else
         if num_threads % dims != 0
-            num_threads = floor(Int, num_threads/dims)*dims
+            num_threads = (floor(Int, num_threads/dims),dims)
         end 
         kernel! = sim_type(CUDADevice(),num_threads)
     end
@@ -36,24 +36,22 @@ function repulsive(pos1, pos2, temp_acceleration, lid, n)
     end
 end
 
-function gravity(pos1, pos2, temp_acceleration, lid, tidy, n)
+function gravity(pos1, pos2, temp_acceleration, lidx, lidy, n)
     r2 = 0
 
     for k = 1:n
-        r2 += (pos1[k, lid]-pos2[k, lid]) *
-              (pos1[k, lid]-pos2[k, lid])
+        r2 += (pos1[k, lidx]-pos2[k, lidx]) *
+              (pos1[k, lidx]-pos2[k, lidx])
     end
 
-#=
     if r2 == 0
         #@print(lid, '\t, tidx)
-        @print(pos1[1, lid], '\t', pos1[2, lid], '\t',
-               pos2[1, lid], '\t', pos2[2, lid], '\n')
+        @print(pos1[1, lidx], '\t', pos1[2, lidx], '\t',
+               pos2[1, lidx], '\t', pos2[2, lidx], '\n')
     end
-=#
 
-    u = (pos1[tidy, lid]-pos2[tidy, lid])/sqrt(r2)
-    temp_acceleration[tidy, lid] += (-u/(r2+1))
+    u = (pos1[lidy, lidx]-pos2[lidy, lidx])/sqrt(r2)
+    temp_acceleration[lidy, lidx] += (-u/(r2+1))
 end
 
 function gravity_4d(pos1, pos2, temp_acceleration, lid, tidx, n)
@@ -74,35 +72,36 @@ end
 # TODO: parallel summation for accelerations
 @kernel function nbody!(accelerations, positions, force_law)
     tidy, tidx = @index(Global, NTuple)
-    lid = @index(Local, Linear)
+    lidy, lidx = @index(Local, NTuple)
 
     #@print(tidy, '\t', tidx, '\n')
 
     @uniform n = size(accelerations)[1]
 
-    @uniform gs = @groupsize()[1]
-    temp_acceleration = @localmem Float64 (4, gs)
-    temp_position1 = @localmem Float64 (4, gs)
-    temp_position2 = @localmem Float64 (4, gs)
+    @uniform gsy = @groupsize()[1]
+    @uniform gsx = @groupsize()[2]
+    temp_acceleration = @localmem Float64 (gsy, gsx)
+    temp_position1 = @localmem Float64 (gsy, gsx)
+    temp_position2 = @localmem Float64 (gsy, gsx)
 
     #@print(tidy, '\t', tidx, '\n')
     #@print(size(temp_acceleration)[1], '\t', size(temp_acceleration)[2], '\n')
 
-    temp_acceleration[tidy, lid] = 0
-    temp_position1[tidy, lid] = positions[tidy,tidx]
+    temp_acceleration[lidy, lidx] = 0
+    temp_position1[lidy, lidx] = positions[tidy,tidx]
 
     for j = 1:size(positions)[2]
-        if j != tidx && lid <= size(positions)[2]
-            temp_position2[tidy, lid] = positions[tidy, j]
-            @synchronize
+        temp_position2[lidy, lidx] = positions[tidy, j]
+        @synchronize
+
+        if j != tidx && lidx <= size(positions)[2]
             force_law(temp_position1,
                       temp_position2,
-                      temp_acceleration, lid, tidy, n)
+                      temp_acceleration, lidx, lidy, n)
         end
     end
 
-    accelerations[tidy,tidx] = temp_acceleration[tidy, lid]
-
+    accelerations[lidy,tidx] = temp_acceleration[tidy, lidx]
 end
 
 function verlet!(p_set1::Particles, p_set2::Particles, temp_positions, dt;
