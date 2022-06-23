@@ -24,13 +24,13 @@ function repulsive(pos1, pos2, temp_acceleration, lid, n)
     r2 = 0
 
     for k = 1:n
-        r2 += (pos1[lid, k]-pos2[lid, k]) *
-              (pos1[lid, k]-pos2[lid, k])
+        @inbounds r2 += (pos1[lid, k]-pos2[lid, k]) *
+                        (pos1[lid, k]-pos2[lid, k])
     end
 
     for k = 1:n
-        u = (pos1[lid, k]-pos2[lid, k])/sqrt(r2)
-        temp_acceleration[lid, k] += (u/(r2+1))
+        @inbounds u = (pos1[lid, k]-pos2[lid, k])/sqrt(r2)
+        @inbounds temp_acceleration[lid, k] += (u/(r2+1))
     end
 end
 
@@ -38,28 +38,27 @@ function gravity(pos1, pos2, temp_acceleration, lid, n)
     r2 = 0
 
     for k = 1:n
-        r2 += (pos1[lid, k]-pos2[lid, k]) *
-              (pos1[lid, k]-pos2[lid, k])
+        @inbounds r2 += (pos1[lid, k]-pos2[lid, k]) *
+                        (pos1[lid, k]-pos2[lid, k])
     end
 
     for k = 1:n
-        u = (pos1[lid, k]-pos2[lid, k])/sqrt(r2)
-        temp_acceleration[lid, k] += (-u/(r2+1))
+        @inbounds u = (pos1[lid, k]-pos2[lid, k])/sqrt(r2)
+        @inbounds temp_acceleration[lid, k] += (-u/(r2+1))
     end
 end
 
 function gravity_4d(pos1, pos2, temp_acceleration, lid, n)
-    r3 = 0
+    r2 = 0
 
     for k = 1:n
-        r3 += abs((pos1[lid, k]-pos2[lid, k]) *
-                  (pos1[lid, k]-pos2[lid, k]) *
-                  (pos1[lid, k]-pos2[lid, k]))
+        @inbounds r2 += (pos1[lid, k]-pos2[lid, k]) *
+                        (pos1[lid, k]-pos2[lid, k]) 
     end
 
     for k = 1:n
-        u = (pos1[lid, k]-pos2[lid, k])/cbrt(r3)
-        temp_acceleration[lid, k] += (-u/(6*(r3+1)))
+        @inbounds u = (pos1[lid, k]-pos2[lid, k])/sqrt(r2)
+        @inbounds temp_acceleration[lid, k] += (-u/(sqrt(r2)^3 + 1))
     end
 end
 
@@ -70,22 +69,24 @@ end
     tid = @index(Global, Linear)
     lid = @index(Local, Linear)
 
-    n = size(accelerations)[2]
+    @inbounds n = size(accelerations)[2]
 
-    @uniform gs = @groupsize()[1]
-    temp_acceleration = @localmem Float64 (gs, 4)
-    temp_position1 = @localmem Float64 (gs, 4)
-    temp_position2 = @localmem Float64 (gs, 4)
+    FT = eltype(positions)
+
+    @inbounds @uniform gs = @groupsize()[1]
+    temp_acceleration = @localmem FT (gs, 4)
+    temp_position1 = @localmem FT (gs, 4)
+    temp_position2 = @localmem FT (gs, 4)
 
     for k = 1:n
-        temp_acceleration[lid, k] = 0
-        temp_position1[lid, k] = positions[tid,k]
+        @inbounds temp_acceleration[lid, k] = 0
+        @inbounds temp_position1[lid, k] = positions[tid,k]
     end
 
     for j = 1:size(positions)[1]
         if j != tid
             for k = 1:n
-                temp_position2[lid,k] = positions[j,k]
+                @inbounds temp_position2[lid,k] = positions[j,k]
             end
 
             force_law(temp_position1,
@@ -95,7 +96,7 @@ end
     end
 
     for k = 1:n
-        accelerations[tid,k] = temp_acceleration[lid,k]
+        @inbounds accelerations[tid,k] = temp_acceleration[lid,k]
     end
 
 end
@@ -131,16 +132,16 @@ end
 @kernel function verlet_kernel!(pos1, pos2, acc1, acc2, temp_pos, dt)
     tid = @index(Global, Linear)
 
-    temp_pos[tid] = pos1[tid]
-    pos1[tid] = pos1[tid] * 2 - pos2[tid] + acc1[tid]*dt*dt
+    @inbounds temp_pos[tid] = pos1[tid]
+    @inbounds pos1[tid] = pos1[tid] * 2 - pos2[tid] + acc1[tid]*dt*dt
 
-    pos2[tid] = temp_pos[tid]
-    acc2[tid] = acc1[tid]
+    @inbounds pos2[tid] = temp_pos[tid]
+    @inbounds acc2[tid] = acc1[tid]
 end
 
 @kernel function calc_velocity_kernel!(pos1, pos2, vel1, vel2, dt)
     tid = @index(Global, Linear)
 
-    vel2[tid] = vel1[tid]
-    vel1[tid] = (pos2[tid] - pos1[tid])/dt
+    @inbounds vel2[tid] = vel1[tid]
+    @inbounds vel1[tid] = (pos2[tid] - pos1[tid])/dt
 end
